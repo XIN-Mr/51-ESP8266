@@ -1,0 +1,7 @@
+".\Objects\main.obj",
+".\Objects\DHT11.obj",
+".\Objects\oled.obj",
+".\Objects\usart.obj",
+".\Objects\time.obj" 
+TO ".\Objects\Proj" 
+PRINT(".\Listings\Proj.m51") RAMSIZE(256) 

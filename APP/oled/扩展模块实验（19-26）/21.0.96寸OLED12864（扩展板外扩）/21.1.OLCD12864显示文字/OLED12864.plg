@@ -1,0 +1,11 @@
+<html>
+<body>
+<pre>
+<h1>礦ision Build Log</h1>
+<h2>Project:</h2>
+D:\ZIOTLAB_mcucode\51wang\板级测试程序\21.0.96寸OLED12864（扩展板外扩）\21.1.OLCD12864显示文字\OLED12864.uvproj
+Project File Date:  03/13/2018
+
+<h2>Output:</h2>
+Clean started: Project: 'OLED12864'
+   deleting intermediate output files for target 'OLED12864'

@@ -1,0 +1,190 @@
+C51 COMPILER V9.60.0.0   DHT11                                                             01/31/2020 22:44:08 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE DHT11
+OBJECT MODULE PLACED IN .\Objects\DHT11.obj
+COMPILER INVOKED BY: D:\MDK\C51\BIN\C51.EXE ..\APP\DHT11\DHT11.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\APP\DHT11;..\APP\ole
+                    -d;..\APP\Usart;..\APP\ESP8266;..\User;..\APP\time) DEBUG OBJECTEXTEND PRINT(.\Listings\DHT11.lst) TABS(2) OBJECT(.\Objec
+                    -ts\DHT11.obj)
+
+line level    source
+
+   1          #define _DHT11_C_
+   2          #include "include.h"
+   3          
+   4          /**
+   5          * 介绍:  DHT11采集源文件
+   6          * 说明:  采集的引脚为:P0^0 可在DHT11.h文件中修改
+   7          * 说明:  采集的温湿度数据存储--DHT11Data[4]
+   8          * 说明:  None
+   9          * 说明:  None
+  10          * 支持:  QQ946029359 --群 607064330
+  11          * 淘宝:  https://shop411638453.taobao.com/
+  12          * 作者:  小五
+  13          **/
+  14          
+  15          
+  16          uchar DHT11Data[4]={0};//温湿度数据(温度高位,温度低位,湿度高位,湿度低位)
+  17          uchar OvertimeCnt = 0;//每一次引脚检测while循环超时变量
+  18          uchar GatherRrrorCnt = 0;//采集出错的次数
+  19          uchar LastT=0,LastR=0;//记录上一次的温湿度
+  20          
+  21          /**
+  22          * @brief  DHT11开始信号
+  23          * @param  
+  24          * @param  None
+  25          * @param  None
+  26          * @retval None
+  27          * @example 
+  28          **/
+  29          void DHT11_start()
+  30          {
+  31   1         DHT11Pin=1;
+  32   1         Delay10uS();
+  33   1         DHT11Pin=0;
+  34   1         DelayMs(20);//延时18ms以上
+  35   1         DHT11Pin=1;
+  36   1         Delay10uS();Delay10uS();
+  37   1         Delay10uS();Delay10uS();
+  38   1      }
+  39          
+  40          /**
+  41          * @brief  读取DHT11的8位返回数据
+  42          * @param  
+  43          * @param  None
+  44          * @param  None
+  45          * @retval None
+  46          * @example 
+  47          **/
+  48          uchar DHT11_ReadByte()      //接收一个字节
+  49          {
+  50   1         uchar i=0,dat=0;
+  51   1         for(i=0;i<8;i++)//循环接收8位数据
+  52   1         {        
+  53   2            OvertimeCnt=0;     
+C51 COMPILER V9.60.0.0   DHT11                                                             01/31/2020 22:44:08 PAGE 2   
+
+  54   2            while(DHT11Pin==0 && OvertimeCnt<60)//等待50us低电平过去
+  55   2            {
+  56   3              OvertimeCnt++;
+  57   3            }
+  58   2            if(OvertimeCnt >60) goto ReadByteEnd;
+  59   2            
+  60   2            
+  61   2            Delay10uS();
+  62   2            Delay10uS();//等待20uS之后再去判断引脚的电平
+  63   2            
+  64   2            dat<<=1;           //接收数居前先移动一位,否则数据会丢失一位
+  65   2            if(DHT11Pin==1)    //数据为1时，使dat加1来接收数据1
+  66   2            {
+  67   3               dat = dat + 1;
+  68   3            }
+  69   2            
+  70   2            OvertimeCnt=0;
+  71   2            while(DHT11Pin==1 && OvertimeCnt<40)//如果数据是1的话还会有大约30uS的高电平存在
+  72   2            {
+  73   3              OvertimeCnt++;
+  74   3            }
+  75   2            if(OvertimeCnt >40) goto  ReadByteEnd;
+  76   2          }  
+  77   1          return dat;
+  78   1          
+  79   1          ReadByteEnd:
+  80   1          return 0;//出错返回0数据,,,这样的话数据最后校验和的时候应该是错误的
+  81   1      }
+  82          
+  83          
+  84          /**
+  85          * @brief  读取DHT11温湿度数据
+  86          * @param  
+  87          * @param  None
+  88          * @param  None
+  89          * @retval None
+  90          * @example 
+  91          **/
+  92          void DHT11_Receive()//接收40位的数据
+  93          {
+  94   1        uchar RH,RL,TH,TL,revise; 
+  95   1        DHT11_start();
+  96   1        if(DHT11Pin==0)//响应拉低了信号
+  97   1        { 
+  98   2          OvertimeCnt = 0;
+  99   2          while(DHT11Pin==0 && OvertimeCnt < 80)//等待80uS低电平过去
+ 100   2          {
+ 101   3            OvertimeCnt++;
+ 102   3            nop_();
+ 103   3          }
+ 104   2          if(OvertimeCnt >80) goto  ReceiveEnd;
+ 105   2          
+ 106   2          while(DHT11Pin==1 && OvertimeCnt < 80)//等待80uS高电平过去
+ 107   2          {
+ 108   3            OvertimeCnt++;
+ 109   3            nop_();
+ 110   3          }
+ 111   2          if(OvertimeCnt >80) goto  ReceiveEnd;
+ 112   2          
+ 113   2          RH=DHT11_ReadByte();    //接收湿度高八位  
+ 114   2          RL=DHT11_ReadByte();    //接收湿度低八位(DHT11实际上没有小数)  
+ 115   2          TH=DHT11_ReadByte();    //接收温度高八位  
+C51 COMPILER V9.60.0.0   DHT11                                                             01/31/2020 22:44:08 PAGE 3   
+
+ 116   2          TL=DHT11_ReadByte();    //接收温度低八位(DHT11实际上没有小数) 
+ 117   2          revise=DHT11_ReadByte(); //接收校正位
+ 118   2          
+ 119   2          Delay10uS();Delay10uS();
+ 120   2          Delay10uS();Delay10uS();
+ 121   2          Delay10uS();Delay10uS();//延时60uS让最后的50uS低电平过去
+ 122   2          DHT11Pin = 1;//通信完拉高
+ 123   2          
+ 124   2          
+ 125   2          if((RH+RL+TH+TL)==revise)//检测校验和是否正确
+ 126   2          {
+ 127   3            LastT = TH;
+ 128   3            LastR = RH;
+ 129   3            DHT11Data[0]=TH;
+ 130   3            DHT11Data[1]=TL;
+ 131   3            DHT11Data[2]=RH;
+ 132   3            DHT11Data[3]=RL;
+ 133   3            GatherRrrorCnt = 0;
+ 134   3          } 
+ 135   2          else
+ 136   2          { 
+ 137   3            if(abs(LastT-TH)<3 && abs(LastR-RH)<3)//如果误差不是很大也认为是正确的数据
+ 138   3            {
+ 139   4              DHT11Data[0]=TH;
+ 140   4              DHT11Data[1]=TL;
+ 141   4              DHT11Data[2]=RH;
+ 142   4              DHT11Data[3]=RL;
+ 143   4              GatherRrrorCnt = 0;
+ 144   4            }
+ 145   3            else
+ 146   3            {
+ 147   4              GatherRrrorCnt++;
+ 148   4            }
+ 149   3          }
+ 150   2        }
+ 151   1        ReceiveEnd:
+ 152   1        GatherRrrorCnt ++ ;
+ 153   1        if(GatherRrrorCnt>5)//超过5次采集错误
+ 154   1        {
+ 155   2          GatherRrrorCnt = 0;
+ 156   2          DHT11Data[0]=0xff;
+ 157   2          DHT11Data[1]=0xff;
+ 158   2          DHT11Data[2]=0xff;
+ 159   2          DHT11Data[3]=0xff;
+ 160   2        }
+ 161   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    397    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      8       7
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

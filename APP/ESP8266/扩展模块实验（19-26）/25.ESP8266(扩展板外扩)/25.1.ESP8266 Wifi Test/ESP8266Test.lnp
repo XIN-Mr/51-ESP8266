@@ -1,0 +1,4 @@
+"STARTUP.obj",
+"ds18b20.obj",
+"main.obj" 
+TO "ESP8266Test" 

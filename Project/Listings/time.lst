@@ -1,0 +1,91 @@
+C51 COMPILER V9.60.0.0   TIME                                                              01/31/2020 22:44:08 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE TIME
+OBJECT MODULE PLACED IN .\Objects\time.obj
+COMPILER INVOKED BY: D:\MDK\C51\BIN\C51.EXE ..\APP\time\time.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\APP\DHT11;..\APP\oled;
+                    -..\APP\Usart;..\APP\ESP8266;..\User;..\APP\time) DEBUG OBJECTEXTEND PRINT(.\Listings\time.lst) TABS(2) OBJECT(.\Objects\
+                    -time.obj)
+
+line level    source
+
+   1          #define _TIME_C_
+   2          #include "include.h"
+   3          
+   4          int TimeCnt = 0;
+   5          
+   6          void Delay10uS()
+   7          {
+   8   1        nop_();
+   9   1        nop_();
+  10   1        nop_();
+  11   1        nop_();
+  12   1        nop_();
+  13   1        nop_();
+  14   1      }
+  15          
+  16          void DelayMs(int s)
+  17          {
+  18   1        while(s--)
+  19   1        {
+  20   2          delay1ms();
+  21   2        }
+  22   1      }
+  23          
+  24          void delay1ms(void)   //误差 -0.651041666667us
+  25          {
+  26   1          unsigned char a,b,c;
+  27   1          for(c=1;c>0;c--)
+  28   1              for(b=142;b>0;b--)
+  29   1                  for(a=2;a>0;a--);
+  30   1      }
+  31          
+  32          //定时器初始化
+  33          void InitTimer0(void)
+  34          {
+  35   1          TMOD |= 0x01;//用|=防止配置冲突
+  36   1          TH0 = (65536 - 5000)/256;
+  37   1          TL0 = (65536 - 5000)%256;
+  38   1          EA = 1;
+  39   1          ET0 = 1;
+  40   1          TR0 = 1;
+  41   1      }
+  42          
+  43          void Timer0Interrupt(void) interrupt 1
+  44          {
+  45   1        TH0 = (65536 - 5000)/256;
+  46   1        TL0 = (65536 - 5000)%256;
+  47   1        
+  48   1        TimeCnt ++;
+  49   1        
+  50   1        if (UsartReadCnt != 0)//如果接收到数据了
+  51   1        {
+  52   2            if (UsartIdleCnt == UsartReadCnt)//数据个数一段时间没了变化
+  53   2            {
+C51 COMPILER V9.60.0.0   TIME                                                              01/31/2020 22:44:08 PAGE 2   
+
+  54   3              UsartReadCntCopy = UsartReadCnt;
+  55   3              UsartReadCnt = 0;//清零数据个数
+  56   3              UsartIdleCnt = 0;//清零
+  57   3              UsartFlage = 1;
+  58   3            }
+  59   2            else
+  60   2            {
+  61   3              UsartIdleCnt = UsartReadCnt;
+  62   3            }
+  63   2        }
+  64   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    157    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      2       2
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

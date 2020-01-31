@@ -1,0 +1,246 @@
+C51 COMPILER V9.60.0.0   USART                                                             01/31/2020 22:44:08 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE USART
+OBJECT MODULE PLACED IN .\Objects\usart.obj
+COMPILER INVOKED BY: D:\MDK\C51\BIN\C51.EXE ..\APP\Usart\usart.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\APP\DHT11;..\APP\ole
+                    -d;..\APP\Usart;..\APP\ESP8266;..\User;..\APP\time) DEBUG OBJECTEXTEND PRINT(.\Listings\usart.lst) TABS(2) OBJECT(.\Objec
+                    -ts\usart.obj)
+
+line level    source
+
+   1          #define _USART_C_
+   2          #include "include.h"
+   3          
+   4          /**
+   5          * 介绍:  串口函数
+   6          * 说明:  利用定时器2达到 115200 hZ
+   7          * 说明:  可以用串口中断发送数据
+   8          * 说明:  利用定时器做了接收空闲检测
+   9          * 说明:  None
+  10          * 支持:  QQ946029359 --群 607064330
+  11          * 淘宝:  https://shop411638453.taobao.com/
+  12          * 作者:  小五
+  13          **/
+  14          
+  15          #define FOSC 12000000L      //System frequency
+  16          #define BAUD 2400       //UART baudrate
+  17          
+  18          
+  19          bit UsartFlage = 0;
+  20          int UsartIdleCnt =0;
+  21          unsigned char  UsartReadCnt = 0;
+  22          unsigned char  UsartReadCntCopy = 0;
+  23          unsigned char  UsartReceive[ReadLength] = {0};
+  24          
+  25          unsigned char *UsartSendData;
+  26          unsigned char UsartSendDataCnt;
+  27          
+  28          /**
+  29          * @brief  串口初始化函数
+  30          * @param  
+  31          * @param  None
+  32          * @param  None
+  33          * @retval None
+  34          * @example 
+  35          **/
+  36          //void InitUART(long Baud)
+  37          //{
+  38          //  if(Baud == 115200)
+  39          //  {
+  40          //    SCON=0x50; //串口工作方式1，8位UART，波特率可变  
+  41          //    TH2=0xFF;           
+  42          //    TL2=0xFD;    //波特率:115200 晶振=11.0592MHz 
+  43          //    RCAP2H=0xFF;   
+  44          //    RCAP2L=0xFD; //16位自动再装入值
+  45          
+  46          //    /*****************/
+  47          //    TCLK=1;   
+  48          //    RCLK=1;   
+  49          //    C_T2=0;   
+  50          //    EXEN2=0; //波特率发生器工作方式
+  51          //    
+  52          //    /*****************/
+  53          //    TR2=1 ; //定时器2开始
+C51 COMPILER V9.60.0.0   USART                                                             01/31/2020 22:44:08 PAGE 2   
+
+  54          //  }
+  55          //  else
+  56          //  {
+  57          //    TMOD |= 0x20;
+  58          //    SCON = 0x50;
+  59          //    switch(Baud)
+  60          //    {
+  61          //      case 2400  :TH1 = 0xF4;TL1 = TH1;PCON = 0x00;break;
+  62          //      case 4800  :TH1 = 0xFA;TL1 = TH1;PCON = 0x00;break;
+  63          //      case 9600  :TH1 = 0xFD;TL1 = TH1;PCON = 0x00;break;
+  64          //      case 14400 :TH1 = 0xFE;TL1 = TH1;PCON = 0x00;break;
+  65          //      case 19200 :TH1 = 0xFD;TL1 = TH1;PCON = 0x80;break;
+  66          //      default    :TH1 = 0xFD;TL1 = TH1;PCON = 0x00;break;
+  67          //    }
+  68          //    
+  69          //    TR1 = 1;
+  70          //  }
+  71          //  EA = 1;//总中断
+  72          //  ES = 1;//串口中断
+  73          //}
+  74          
+  75          
+  76          
+  77          void InitUART()
+  78          {
+  79   1          SCON = 0x50;            //8-bit variable UART
+  80   1          TL2 = RCAP2L = (65536-(FOSC/32/BAUD));            //Set auto-reload vaule  65,506
+  81   1          TH2 = RCAP2H = (65536-(FOSC/32/BAUD)) >> 8;
+  82   1          T2CON = 0x34;           //Timer2 start run
+  83   1          ES = 1;                 //Enable UART interrupt
+  84   1          EA = 1;                 //Open master interrupt switch
+  85   1      }
+  86          
+  87          
+  88          /**
+  89          * @brief  串口发送函数
+  90          * @param  value--发送的数据
+  91          * @param  None
+  92          * @param  None
+  93          * @retval None
+  94          * @example 
+  95          **/
+  96          void UartSend(unsigned char value) 
+  97          {
+  98   1        ES=0;  //关闭串口中断--使用Printf 需要屏蔽 
+  99   1        TI=0;   //清发送完毕中断请求标志位   
+ 100   1        SBUF=value; //发送  
+ 101   1        while(TI==0); //等待发送完毕   
+ 102   1        TI=0;   //清发送完毕中断请求标志位 --使用Printf 需要屏蔽   
+ 103   1        ES=1;  //允许串口中断  --使用Printf 需要屏蔽 
+ 104   1      }
+ 105          
+ 106          /**
+ 107          * @brief  串口发送函数中断发送
+ 108          * @param  *value--数据的地址
+ 109          * @param  DataLen--数据的个数
+ 110          * @param  None
+ 111          * @retval None
+ 112          * @example 
+ 113          **/
+ 114          void UartSendTI(unsigned char *value,int DataLen) 
+ 115          {
+C51 COMPILER V9.60.0.0   USART                                                             01/31/2020 22:44:08 PAGE 3   
+
+ 116   1        UsartSendData = value;
+ 117   1        UsartSendDataCnt = DataLen;
+ 118   1        TI = 1;
+ 119   1      }
+ 120          
+ 121          
+ 122          /**
+ 123          * @brief  串口中断函数
+ 124          * @param  
+ 125          * @param  None
+ 126          * @param  None
+ 127          * @retval None
+ 128          * @example 
+ 129          **/
+ 130          void UARTInterrupt(void) interrupt 4
+ 131          {
+ 132   1        if(RI)
+ 133   1        {
+ 134   2          RI=0;
+ 135   2          UsartReceive[UsartReadCnt]=SBUF;//接收串口数据
+ 136   2          UsartReadCnt++;
+ 137   2          if(UsartReadCnt>ReadLength-2)//防止溢出
+ 138   2          {
+ 139   3            UsartReadCnt = 0;
+ 140   3          }
+ 141   2        }
+ 142   1        if(TI)
+ 143   1        {
+ 144   2          TI = 0;
+ 145   2          if(UsartSendDataCnt>0)
+ 146   2          {
+ 147   3            SBUF = *UsartSendData++;
+ 148   3            UsartSendDataCnt--;
+ 149   3          }
+ 150   2          else
+ 151   2          {
+ 152   3            TI = 0;
+ 153   3          }
+ 154   2        }
+ 155   1      }
+ 156          /**
+ 157          * @brief  加入此函数可使用printf 发送数据
+ 158          * @param  
+ 159          * @param  None
+ 160          * @param  None
+ 161          * @retval None
+ 162          * @example 
+ 163          **/
+ 164          char putchar(char c)  
+ 165          {  
+ 166   1          UartSend(c);  
+ 167   1          return c;  
+ 168   1      }  
+ 169          
+ 170          /*
+ 171          
+ 172          //以下代码是自己写的printf发送 
+ 173          void UartSendByte(unsigned char c)  
+ 174          {  
+ 175              if(c=='\n')//如果遇到\n就换行  
+ 176              {  
+ 177                  //发送CR(carriage return)  
+C51 COMPILER V9.60.0.0   USART                                                             01/31/2020 22:44:08 PAGE 4   
+
+ 178                  SBUF=0x0D;   
+ 179                  while(!TI);//等待发送完成  
+ 180                  TI=0;  
+ 181                    
+ 182                  //发送 LF(NL line feed,new line)  
+ 183                  SBUF=0x0A;   
+ 184                  while(!TI);//等待发送完成  
+ 185                  TI=0;         
+ 186              }  
+ 187              else  
+ 188              {  
+ 189                  SBUF=c;  
+ 190                  while(!TI);//等待发送完成  
+ 191                  TI=0;  
+ 192              }  
+ 193          }  
+ 194          
+ 195          void sendstring(unsigned char *string)//此处*string相当于数组  
+ 196          {  
+ 197              while(*string!='\0')//判断是否到字符串末尾  
+ 198              {  
+ 199                  UartSendByte(*string);  
+ 200                  string++;  
+ 201              }  
+ 202          }  
+ 203            
+ 204          void uart_printf(const char *fmt,...)  
+ 205          { 
+ 206              va_list ap;  
+ 207              char xdata string[100];//访问内部拓展RAM，非访问外部RAM，不能超过内部拓展RAM大小(此处为1024) 
+ 208                
+ 209              va_start(ap,fmt);  
+ 210              vsprintf(string,fmt,ap);//此处也可以使用sprintf函数，用法差不多，稍加修改即可，此处略去  
+ 211              sendstring(string);  
+ 212              va_end(ap);  
+ 213          }  
+ 214          
+ 215          */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    158    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     58    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
